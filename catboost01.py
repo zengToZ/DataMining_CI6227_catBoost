@@ -22,6 +22,9 @@ df = df[~((df['Sex']=='NA')        | (np.isnan(df['Age'])) | (np.isnan(df['Heigh
           (np.isnan(df['Weight'])) | (df['NOC']=='NA')     | (np.isnan(df['Year']))    | 
           (df['Season']=='NA')     | (df['City']=='NA')    | (df['Sport']=='NA')       | 
           (df['Event']=='NA'))]
+# must reorder the index to avoid any mistake in step (4) and (5)
+df = df.reset_index(drop=True)
+print(df)
 print(df.shape)
 
 #(3)
@@ -38,12 +41,14 @@ df.hist(column='Year'   , bins=50)
 #(4)
 # except 'Year', 'Age' 'Height' 'Weight' all more or less conform to normal distribution
 # 'qcut()' method from pandas will be adopted to transfer continous value to categorical ones, where quantiles set to be deciles(10).
+# Quantiles means the dividing point that divide the data according to the density, higher the density, narrower the bin
+# 'labels=False' label set to be false to return only integer indicators of the bins, which means 0~9 indicator
 new_age     = pd.qcut(df.iloc[:, 1].tolist(),10, labels=False, retbins=True)
 new_height  = pd.qcut(df.iloc[:, 2].tolist(),10, labels=False, retbins=True)
 new_weight  = pd.qcut(df.iloc[:, 3].tolist(),10, labels=False, retbins=True)
 new_year    = pd.qcut(df.iloc[:, 5].tolist(),10, labels=False, retbins=True)
 # create new subset
-new_df      = pd.DataFrame({'Age':list(new_age[0])      , 'Height':list(new_height[0]),                            'Weight':list(new_weight[0]), 'Year':list(new_year[0])})
+new_df      = pd.DataFrame({'Age':list(new_age[0]), 'Height':list(new_height[0]), 'Weight':list(new_weight[0]), 'Year':list(new_year[0])})
 print(new_df.shape)
 # merge the new subset with the old set
 df = df.drop(columns=['Age','Height','Weight','Year'])
@@ -54,6 +59,16 @@ print(list(df.columns))
 print(df.shape)
 
 #(5)
+# To set all other attributes from string type to numeric type. e.g. for 'Sex': M=1, F=0
+df['Sex'] = pd.Categorical(df['Sex']).codes
+df['NOC'] = pd.Categorical(df['NOC']).codes
+df['Season'] = pd.Categorical(df['Season']).codes
+df['City'] = pd.Categorical(df['City']).codes
+df['Sport'] = pd.Categorical(df['Sport']).codes
+df['Event'] = pd.Categorical(df['Event']).codes
+df['Medal'] = pd.Categorical(df['Medal']).codes
+
+#(6)
 # Now the dataset are divided into two parts: training and testing. since the dataset is large, 8-2 or 9-1 ratio is enough for training purpose
 train, test = train_test_split(df, test_size=0.1)
 x           = train.drop(columns='Medal')
@@ -77,7 +92,7 @@ model.fit(
     x_train, y_train,
     cat_features=[4,5,6,7,8,9],
     eval_set=(x_validation, y_validation),
-#     logging_level='Verbose',  # you can uncomment this for text output
+    logging_level='Verbose',
     plot=True
 );
 
