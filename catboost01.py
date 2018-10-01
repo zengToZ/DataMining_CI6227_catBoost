@@ -1,7 +1,6 @@
 from catboost import CatBoostClassifier, Pool, cv
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 
 df = pd.read_csv("train.csv")
@@ -81,20 +80,45 @@ print(x_test.shape)
 # Cross-validation is also necessary, thus we divide the training set into two: training, validating
 x_train, x_validation, y_train, y_validation = train_test_split(x, y, train_size=0.8)
 
-
+#(7)
+# Add model as CatBoostClassifier
 model = CatBoostClassifier(
     custom_loss=['Accuracy'],
-    random_seed=42,
+    use_best_model=True,
     logging_level='Silent'
 )
-
+# Train the model
 model.fit(
     x_train, y_train,
-    cat_features=[4,5,6,7,8,9],
     eval_set=(x_validation, y_validation),
     logging_level='Verbose',
     plot=True
-);
+); 
 
+# Model Cross-Validation
+cv_params = model.get_params()
+cv_params.update({
+    'loss_function': 'Logloss'
+})
+cv_data = cv(
+    Pool(x, y),
+    cv_params,
+    verbose=True,
+    plot=True
+)
+# Print the best accuracy score
+print('Before cross validation:', model.score(x_train,y_train))
+print('Precise validation accuracy score: {}'.format(np.max(cv_data['test-Accuracy-mean'])))
+# Apply model to test set
+predictions         = model.predict(x_test)
+predictions_probs   = model.predict_proba(x_test)
+print(predictions[:])
+print(predictions_probs[:])
 
-
+#(8)
+# Evaluate Feature Importance
+train_pool = Pool(x_train, y_train)
+feature_importances = model.get_feature_importance(train_pool)
+feature_names = x_train.columns
+for score, name in sorted(zip(feature_importances, feature_names)):
+    print('{}: {}'.format(name, score))
