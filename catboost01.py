@@ -2,6 +2,7 @@ from catboost import CatBoostClassifier, Pool, cv
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 df = pd.read_csv("train.csv")
 
@@ -21,6 +22,7 @@ df = df[~((df['Sex']=='NA')        | (np.isnan(df['Age'])) | (np.isnan(df['Heigh
           (np.isnan(df['Weight'])) | (df['NOC']=='NA')     | (np.isnan(df['Year']))    | 
           (df['Season']=='NA')     | (df['City']=='NA')    | (df['Sport']=='NA')       | 
           (df['Event']=='NA'))]
+#| (df['City']=='NA')
 # must reorder the index to avoid any mistake in step (4) and (5)
 df = df.reset_index(drop=True)
 print(df)
@@ -59,13 +61,14 @@ print(df.shape)
 
 #(5)
 # To set all other attributes from string type to numeric type. e.g. for 'Sex': M=1, F=0
-df['Sex'] = pd.Categorical(df['Sex']).codes
-df['NOC'] = pd.Categorical(df['NOC']).codes
-df['Season'] = pd.Categorical(df['Season']).codes
-df['City'] = pd.Categorical(df['City']).codes
-df['Sport'] = pd.Categorical(df['Sport']).codes
-df['Event'] = pd.Categorical(df['Event']).codes
+#df['Sex'] = pd.Categorical(df['Sex']).codes
+#df['NOC'] = pd.Categorical(df['NOC']).codes
+#df['Season'] = pd.Categorical(df['Season']).codes
+#df['City'] = pd.Categorical(df['City']).codes
+#df['Sport'] = pd.Categorical(df['Sport']).codes
+#df['Event'] = pd.Categorical(df['Event']).codes
 df['Medal'] = pd.Categorical(df['Medal']).codes
+
 
 #(6)
 # Now the dataset are divided into two parts: training and testing. since the dataset is large, 8-2 or 9-1 ratio is enough for training purpose
@@ -73,6 +76,10 @@ train, test = train_test_split(df, test_size=0.1)
 x           = train.drop(columns='Medal')
 y           = train['Medal']
 x_test      = test.drop(columns='Medal')
+y_test      = test['Medal']
+
+categorical_features_indices = np.where(x.dtypes != np.float)[0]
+print(categorical_features_indices)
 print(x.shape)
 print(x.dtypes)
 print(y.shape)
@@ -83,41 +90,47 @@ x_train, x_validation, y_train, y_validation = train_test_split(x, y, train_size
 #(7)
 # Add model as CatBoostClassifier
 model = CatBoostClassifier(
-    custom_loss=['Accuracy'],
-    use_best_model=True,
+    #iterations=50,
+    #learning_rate=0.1,
+    loss_function='MultiClass',
+    use_best_model=True,                    # set to False if use iteration & learning_rate
     logging_level='Silent'
 )
 # Train the model
 model.fit(
     x_train, y_train,
     eval_set=(x_validation, y_validation),
+    cat_features=categorical_features_indices,
     logging_level='Verbose',
     plot=True
 ); 
 
 # Model Cross-Validation
-cv_params = model.get_params()
-cv_params.update({
-    'loss_function': 'Logloss'
-})
-cv_data = cv(
-    Pool(x, y),
-    cv_params,
-    verbose=True,
-    plot=True
-)
+#cv_params = model.get_params()
+#cv_data = cv(
+#    Pool(x, y, cat_features=categorical_features_indices),
+#    cv_params,
+#    verbose=True,
+#    plot=True
+#)
+
 # Print the best accuracy score
-print('Before cross validation:', model.score(x_train,y_train))
-print('Precise validation accuracy score: {}'.format(np.max(cv_data['test-Accuracy-mean'])))
+vali_prediction_prob    = model.predict(x_validation,prediction_type='Probability')
+print('Validation set accuracy score:', accuracy_score(y_validation,np.rint(vali_prediction_prob.dot([-1, 0, 1, 2])) ))
+#print('Precise validation accuracy score: {}'.format(np.max(cv_data['test-Accuracy-mean'])))
+
 # Apply model to test set
-predictions         = model.predict(x_test)
-predictions_probs   = model.predict_proba(x_test)
-print(predictions[:])
-print(predictions_probs[:])
+test_prediction_prob    = model.predict(x_test,prediction_type='Probability')
+print(test_prediction_prob)
+predictions             = np.rint(test_prediction_prob.dot([-1, 0, 1, 2]))
+print(predictions)
+# calculate and print the accuracy score for test samples
+print('Test set accuracy score:',accuracy_score(y_test,predictions))
+
 
 #(8)
 # Evaluate Feature Importance
-train_pool = Pool(x_train, y_train)
+train_pool = Pool(x_train, y_train, cat_features=categorical_features_indices)
 feature_importances = model.get_feature_importance(train_pool)
 feature_names = x_train.columns
 for score, name in sorted(zip(feature_importances, feature_names)):
