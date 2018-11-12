@@ -69,7 +69,7 @@ print(df.dtypes)
 #4=good
 #5=very good
 for i in range(size):
-    # Budget fucntion:
+    # Convert to 1 - 5 labels:
     if df['labels'][i] < 2: 
         df.iat[i,9] = 1
     elif df['labels'][i] >= 2 and df['labels'][i] < 4:
